@@ -21,7 +21,7 @@ class PaymentFlow(StatesGroup):
 async def start_payment(message: Message, state: FSMContext) -> None:
     await state.clear()
     await message.answer(
-        f"Стоимость месячного доступа: **{settings.subscription_price} ₸**\n\n"
+        "Стоимость подписки — **9 999 ₸ / 1 515 ₽ в месяц.**\n\n"
         "Выберите удобный способ оплаты ниже.",
         reply_markup=payment_methods_kb,
     )
