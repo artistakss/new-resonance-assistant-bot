@@ -9,8 +9,20 @@ from typing import List
 
 from dotenv import load_dotenv
 
-# Загружаем переменные из .env (для локальной разработки)
-load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent / ".env")
+# Загружаем переменные из .env
+# Пробуем несколько путей: рядом с config.py, в рабочей директории, в корне проекта
+env_paths = [
+    Path(__file__).resolve().parent.parent / ".env",  # Рядом с bot.py
+    Path.cwd() / ".env",  # В текущей рабочей директории
+    Path.home() / "resonance-assistant" / ".env",  # В домашней директории
+]
+for env_path in env_paths:
+    if env_path.exists():
+        load_dotenv(dotenv_path=env_path, override=False)
+        break
+else:
+    # Если не нашли, пробуем загрузить из текущей директории (может быть установлен через systemd EnvironmentFile)
+    load_dotenv(override=False)
 
 
 def _env(key: str, default: str | None = None) -> str:
@@ -27,6 +39,15 @@ def _env_int(key: str, default: int | None = None) -> int:
             raise RuntimeError(f"Environment variable {key} is required but not set")
         return default
     return int(raw)
+
+
+def _resolve_database_path(path_str: str) -> Path:
+    """Разрешает путь к базе данных относительно рабочей директории"""
+    path = Path(path_str)
+    if path.is_absolute():
+        return path
+    # Относительный путь - разрешаем относительно рабочей директории
+    return Path.cwd() / path
 
 
 @dataclass
@@ -81,7 +102,7 @@ def get_settings() -> Settings:
         gspread_json_string=os.getenv("GSPREAD_JSON_STRING", ""),
         sheet_url=os.getenv("SHEET_URL", ""),
         openai_api_key=os.getenv("OPENAI_API_KEY"),
-        database_path=Path(os.getenv("DATABASE_PATH", "storage/bot.db")),
+        database_path=_resolve_database_path(os.getenv("DATABASE_PATH", "storage/bot.db")),
     )
 
 
