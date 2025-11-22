@@ -2,10 +2,29 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
+import socket
 
+import aiohttp
 from aiogram import Bot, Dispatcher
+from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.client.session.aiohttp import AiohttpSession
+
+# Принудительно используем IPv4 (решение от поддержки PS.kz)
+os.environ['AIOHTTP_NO_EXTENSIONS'] = '1'
+
+
+class IPv4AiohttpSession(AiohttpSession):
+    """Кастомная сессия с принудительным использованием IPv4"""
+    
+    def __init__(self, *args, **kwargs):
+        # Создаем IPv4 connector
+        self._ipv4_connector = aiohttp.TCPConnector(family=socket.AF_INET)
+        super().__init__(*args, **kwargs)
+        # Сразу создаем сессию с IPv4 connector
+        self._session = aiohttp.ClientSession(connector=self._ipv4_connector)
 
 from app.config import settings
 from app.database.repository import init_db
@@ -40,8 +59,30 @@ async def on_startup(bot: Bot) -> None:
 
 
 async def main() -> None:
-    bot = Bot(token=settings.bot_token, parse_mode=ParseMode.MARKDOWN)
-    await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
+    # Принудительно используем IPv4 (решение от поддержки PS.kz)
+    # Создаем кастомную сессию с IPv4
+    session = IPv4AiohttpSession()
+    
+    bot = Bot(
+        token=settings.bot_token,
+        default=DefaultBotProperties(parse_mode=ParseMode.MARKDOWN),
+        session=session,
+    )
+    
+    logging.info("Starting bot with IPv4-only connection...")
+    
+    try:
+        await dp.start_polling(
+            bot,
+            allowed_updates=dp.resolve_used_update_types(),
+        )
+    except KeyboardInterrupt:
+        logging.info("Bot stopped by user")
+    except Exception as exc:
+        logging.error("Fatal error in polling: %s", exc, exc_info=True)
+        raise
+    finally:
+        await session.close()
 
 
 if __name__ == "__main__":
