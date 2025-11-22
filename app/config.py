@@ -58,9 +58,23 @@ class Settings:
     channel_id: int
     channel_invite_link: str
 
-    subscription_price: int = 9999
+    subscription_price: int = 9999  # Цена за 1 месяц (для обратной совместимости)
     subscription_duration_days: int = 30
     reminder_before_days: int = 3
+    
+    # Цены для разных вариантов подписки (в тенге)
+    subscription_prices: dict[int, int] = field(default_factory=lambda: {
+        30: 9999,   # 1 месяц
+        90: 25000,  # 3 месяца (выгоднее на ~5000)
+        180: 45000, # 6 месяцев (выгоднее на ~15000)
+    })
+    
+    # Цены в рублях (для отображения)
+    subscription_prices_rub: dict[int, int] = field(default_factory=lambda: {
+        30: 1515,   # 1 месяц
+        90: 3788,   # 3 месяца
+        180: 6818,  # 6 месяцев
+    })
 
     gspread_json_string: str = ""
     sheet_url: str = ""

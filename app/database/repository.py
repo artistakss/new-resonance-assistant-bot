@@ -42,6 +42,8 @@ CREATE_QUERIES: tuple[str, ...] = (
         file_id TEXT NOT NULL,
         status TEXT DEFAULT 'pending',
         sheet_row INTEGER,
+        duration_days INTEGER DEFAULT 30,
+        price_kzt INTEGER,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(user_id)
     )
@@ -75,6 +77,18 @@ async def init_db() -> None:
                 "INSERT OR IGNORE INTO payment_details(method, label, details) VALUES (?, ?, ?)",
                 (method, label, details),
             )
+        
+        # Миграция: добавляем поля duration_days и price_kzt в payment_checks, если их нет
+        try:
+            await db.execute("ALTER TABLE payment_checks ADD COLUMN duration_days INTEGER DEFAULT 30")
+        except aiosqlite.OperationalError:
+            pass  # Поле уже существует
+        
+        try:
+            await db.execute("ALTER TABLE payment_checks ADD COLUMN price_kzt INTEGER")
+        except aiosqlite.OperationalError:
+            pass  # Поле уже существует
+        
         await db.commit()
 
 
@@ -184,17 +198,32 @@ async def list_payment_methods() -> List[aiosqlite.Row]:
         return await cursor.fetchall()
 
 
-async def log_payment_check(user_id: int, method: str, file_id: str, sheet_row: int | None) -> int:
+async def log_payment_check(
+    user_id: int, 
+    method: str, 
+    file_id: str, 
+    sheet_row: int | None,
+    duration_days: int = 30,
+    price_kzt: int | None = None,
+) -> int:
     async with aiosqlite.connect(DB_PATH.as_posix()) as db:
         cursor = await db.execute(
             """
-            INSERT INTO payment_checks(user_id, method, file_id, sheet_row)
-            VALUES(?, ?, ?, ?)
+            INSERT INTO payment_checks(user_id, method, file_id, sheet_row, duration_days, price_kzt)
+            VALUES(?, ?, ?, ?, ?, ?)
             """,
-            (user_id, method, file_id, sheet_row),
+            (user_id, method, file_id, sheet_row, duration_days, price_kzt),
         )
         await db.commit()
         return cursor.lastrowid
+
+
+async def get_payment_check(check_id: int) -> Optional[aiosqlite.Row]:
+    """Получить информацию о чеке по ID"""
+    async with aiosqlite.connect(DB_PATH.as_posix()) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute("SELECT * FROM payment_checks WHERE id = ?", (check_id,))
+        return await cursor.fetchone()
 
 
 async def update_payment_check_status(check_id: int, status: str) -> None:
