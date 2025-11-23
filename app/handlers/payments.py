@@ -22,7 +22,7 @@ class PaymentFlow(StatesGroup):
     waiting_proof = State()
 
 
-@router.message(F.text == "💳 Оплата подписки")
+@router.message(F.text == "🚪 Вход в Resonance")
 async def start_payment(message: Message, state: FSMContext) -> None:
     await state.clear()
     await message.answer(

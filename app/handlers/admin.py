@@ -31,10 +31,23 @@ class GiftSubscriptionState(StatesGroup):
     waiting_duration = State()
 
 
+class GiftConfirmState(StatesGroup):
+    waiting_user_id = State()
+
+
 def build_review_keyboard(user_id: int, check_id: int, row_index: int | None) -> InlineKeyboardMarkup:
     buttons = [
         [InlineKeyboardButton(text="✅ Подтвердить", callback_data=f"pay-confirm:{user_id}:{check_id}:{row_index or 0}")],
         [InlineKeyboardButton(text="❌ Отклонить", callback_data=f"pay-reject:{user_id}:{check_id}:{row_index or 0}")],
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def build_gift_review_keyboard(username: str, check_id: int, row_index: int | None) -> InlineKeyboardMarkup:
+    """Клавиатура для подтверждения подарка подписки"""
+    buttons = [
+        [InlineKeyboardButton(text="✅ Подтвердить подарок", callback_data=f"gift-confirm:{username}:{check_id}:{row_index or 0}")],
+        [InlineKeyboardButton(text="❌ Отклонить", callback_data=f"gift-reject:{username}:{check_id}:{row_index or 0}")],
     ]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
@@ -52,7 +65,6 @@ async def admin_menu(message: Message) -> None:
             [InlineKeyboardButton(text="💳 Обновить реквизиты", callback_data="admin:update_details")],
             [InlineKeyboardButton(text="👥 Активные подписки", callback_data="admin:list_active")],
             [InlineKeyboardButton(text="📅 Последние записи", callback_data="admin:list_bookings")],
-            [InlineKeyboardButton(text="🎁 Подарить подписку", callback_data="admin:gift_subscription")],
             [InlineKeyboardButton(text="⬅️ Назад", callback_data="admin:back")],
         ]
     )
@@ -190,7 +202,6 @@ async def admin_back(call: CallbackQuery) -> None:
             [InlineKeyboardButton(text="💳 Обновить реквизиты", callback_data="admin:update_details")],
             [InlineKeyboardButton(text="👥 Активные подписки", callback_data="admin:list_active")],
             [InlineKeyboardButton(text="📅 Последние записи", callback_data="admin:list_bookings")],
-            [InlineKeyboardButton(text="🎁 Подарить подписку", callback_data="admin:gift_subscription")],
             [InlineKeyboardButton(text="⬅️ Назад", callback_data="admin:back")],
         ]
     )
@@ -296,3 +307,115 @@ async def confirm_gift_subscription(call: CallbackQuery, state: FSMContext) -> N
         f"Доступ до: {end:%d.%m.%Y}",
     )
     await state.clear()
+
+
+@router.callback_query(F.data.startswith("gift-confirm:"))
+async def confirm_gift_payment(call: CallbackQuery, state: FSMContext) -> None:
+    """Начало подтверждения подарка - запрос user_id"""
+    if call.from_user.id not in settings.allowed_admins:
+        await call.answer("❌ Нет доступа", show_alert=True)
+        return
+    
+    await call.answer()
+    _, username, check_id, row_index = call.data.split(":")
+    check_id = int(check_id)
+    row_index = int(row_index)
+    
+    # Сохраняем данные в состоянии
+    await state.update_data(gift_username=username, gift_check_id=check_id, gift_row_index=row_index)
+    
+    await call.message.edit_text(
+        f"🎁 Подтверждение подарка для @{username}\n\n"
+        "Отправьте Telegram ID пользователя (user_id).\n"
+        "ID можно узнать через @userinfobot или найти в базе данных бота.",
+    )
+    await state.set_state(GiftConfirmState.waiting_user_id)
+
+
+@router.message(GiftConfirmState.waiting_user_id)
+async def receive_gift_user_id(message: Message, state: FSMContext) -> None:
+    """Получение user_id и активация подарка"""
+    if message.from_user.id not in settings.allowed_admins:
+        await message.answer("❌ У вас нет доступа.")
+        await state.clear()
+        return
+    
+    try:
+        user_id = int(message.text.strip())
+    except ValueError:
+        await message.answer("❌ Неверный формат. Отправьте числовой ID пользователя.")
+        return
+    
+    data = await state.get_data()
+    username = data.get("gift_username")
+    check_id = data.get("gift_check_id")
+    row_index = data.get("gift_row_index")
+    
+    # Активируем подписку (1 месяц по умолчанию для подарка)
+    duration_days = 30
+    start = datetime.utcnow()
+    start, end = await repository.set_subscription_active(
+        user_id=user_id,
+        start=start,
+        duration_days=duration_days,
+    )
+    
+    # Обновляем статус чека
+    await repository.update_payment_check_status(check_id, "approved")
+    if row_index:
+        sheets_manager.update_payment_status(row_index, "✅ Подтверждено (подарок)", start, end)
+    
+    # Добавляем пользователя в базу, если его там нет
+    try:
+        user_info = await message.bot.get_chat(user_id)
+        await repository.upsert_user(
+            user_id,
+            user_info.username,
+            user_info.first_name or user_info.full_name,
+        )
+    except Exception as exc:
+        logger.warning("Cannot get user info for %s: %s", user_id, exc)
+    
+    # Добавляем пользователя в канал
+    try:
+        await message.bot.unban_chat_member(chat_id=settings.channel_id, user_id=user_id, only_if_banned=True)
+    except Exception as exc:
+        logger.warning("Cannot unban user in channel: %s", exc)
+    
+    # Уведомляем получателя подарка
+    try:
+        await message.bot.send_message(
+            user_id,
+            f"🎁 Вам подарена подписка на Resonance!\n\n"
+            f"Доступ активен до {end:%d.%m.%Y}.\n"
+            f"Ссылка на канал: {settings.channel_invite_link}",
+        )
+    except Exception as exc:
+        logger.warning("Cannot notify user %s: %s", user_id, exc)
+    
+    await message.answer(
+        f"✅ Подарок активирован!\n"
+        f"Пользователь: @{username} (ID: {user_id})\n"
+        f"Длительность: {duration_days} дней\n"
+        f"Доступ до: {end:%d.%m.%Y}",
+    )
+    await state.clear()
+
+
+@router.callback_query(F.data.startswith("gift-reject:"))
+async def reject_gift_payment(call: CallbackQuery) -> None:
+    """Отклонение подарка подписки"""
+    if call.from_user.id not in settings.allowed_admins:
+        await call.answer("❌ Нет доступа", show_alert=True)
+        return
+    
+    await call.answer()
+    _, username, check_id, row_index = call.data.split(":")
+    check_id = int(check_id)
+    row_index = int(row_index)
+    
+    await repository.update_payment_check_status(check_id, "rejected")
+    if row_index:
+        sheets_manager.update_payment_status(row_index, "❌ Отклонено")
+    
+    await call.message.edit_text(f"Подарок для @{username} отклонен", reply_markup=None)

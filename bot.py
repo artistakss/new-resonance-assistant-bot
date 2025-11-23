@@ -28,7 +28,7 @@ class IPv4AiohttpSession(AiohttpSession):
 
 from app.config import settings
 from app.database.repository import init_db
-from app.handlers import admin, bookings, payments, status, start
+from app.handlers import admin, bookings, gift, payments, status, start
 from app.services.sheets import sheets_manager
 from app.services.subscriptions import setup_scheduler
 
@@ -42,6 +42,7 @@ dp = Dispatcher(storage=MemoryStorage())
 dp.include_router(start.router)
 dp.include_router(bookings.router)
 dp.include_router(payments.router)
+dp.include_router(gift.router)
 dp.include_router(status.router)
 dp.include_router(admin.router)
 
