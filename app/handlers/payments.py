@@ -112,15 +112,21 @@ async def choose_method(call: CallbackQuery, state: FSMContext) -> None:
 
 @router.callback_query(F.data == "pay:ready")
 async def ready_to_upload(call: CallbackQuery, state: FSMContext) -> None:
-    await call.answer()
-    data = await state.get_data()
-    if not data.get("method"):
-        await call.message.answer("Сначала выберите способ оплаты.")
-        return
-    await state.set_state(PaymentFlow.waiting_proof)
-    await call.message.edit_text(
-        "📸 Отправьте фотографию или PDF-файл подтверждения оплаты.",
-    )
+    try:
+        await call.answer()
+        data = await state.get_data()
+        logger.info(f"pay:ready callback from user {call.from_user.id}, data: {data}")
+        if not data.get("method"):
+            await call.message.answer("Сначала выберите способ оплаты.")
+            return
+        await state.set_state(PaymentFlow.waiting_proof)
+        logger.info(f"State set to waiting_proof for user {call.from_user.id}")
+        await call.message.edit_text(
+            "📸 Отправьте фотографию или PDF-файл подтверждения оплаты.",
+        )
+    except Exception as exc:
+        logger.error(f"Error in ready_to_upload: {exc}", exc_info=True)
+        await call.answer("Произошла ошибка. Попробуйте еще раз.")
 
 
 @router.message(PaymentFlow.waiting_proof, F.photo | F.document)
@@ -202,5 +208,6 @@ async def receive_proof(message: Message, state: FSMContext) -> None:
 
 
 @router.message(PaymentFlow.waiting_proof)
-async def invalid_proof(message: Message) -> None:
+async def invalid_proof(message: Message, state: FSMContext) -> None:
+    logger.info(f"Invalid proof from user {message.from_user.id}, text: {message.text}")
     await message.answer("Пришлите, пожалуйста, фото или документ с подтверждением оплаты.")

@@ -34,10 +34,60 @@ async def describe(message: Message) -> None:
 
 @router.message(F.text == "❓ Задать вопрос")
 async def ask_question(message: Message) -> None:
+    from app.config import settings
+    user = message.from_user
+    question_text = "Напишите ваш вопрос в свободной форме."
+    
+    # Отправляем вопрос админу
+    try:
+        admin_message = (
+            f"❓ Новый вопрос\n"
+            f"От: @{user.username or 'N/A'} ({user.id})\n"
+            f"Имя: {user.full_name or 'N/A'}\n\n"
+            f"Вопрос будет отправлен после того, как пользователь его напишет."
+        )
+        await message.bot.send_message(settings.admin_id, admin_message)
+    except Exception as exc:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Failed to notify admin about question: {exc}")
+    
     await message.answer(
-        "Напишите ваш вопрос в свободной форме."
-        " Администратор свяжется с вами в течение дня."
+        question_text + "\nАдминистратор свяжется с вами в течение дня."
     )
+
+
+@router.message(F.text.startswith("❓") == False, F.text != "🚪 Вход в Resonance", F.text != "🎁 Подарить подписку", F.text != "⬅️ Назад")
+async def handle_question(message: Message, state: FSMContext) -> None:
+    """Обработка вопроса пользователя (если не в состоянии оплаты/подарка)"""
+    from app.config import settings
+    
+    # Проверяем, не находимся ли мы в состоянии оплаты или подарка
+    current_state = await state.get_state()
+    if current_state and ("PaymentFlow" in str(current_state) or "GiftFlow" in str(current_state)):
+        return  # Пропускаем, если в состоянии оплаты/подарка
+    
+    user = message.from_user
+    
+    # Отправляем вопрос админу
+    try:
+        admin_message = (
+            f"❓ Вопрос от пользователя\n"
+            f"От: @{user.username or 'N/A'} ({user.id})\n"
+            f"Имя: {user.full_name or 'N/A'}\n\n"
+            f"Вопрос:\n{message.text}"
+        )
+        await message.bot.send_message(settings.admin_id, admin_message)
+        
+        await message.answer(
+            "✅ Ваш вопрос отправлен администратору.\n"
+            "Мы свяжемся с вами в течение дня."
+        )
+    except Exception as exc:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Failed to send question to admin: {exc}")
+        await message.answer("Произошла ошибка при отправке вопроса. Попробуйте позже.")
 
 
 @router.message(F.text == "⬅️ Назад")
