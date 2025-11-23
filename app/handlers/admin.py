@@ -146,7 +146,7 @@ async def confirm_payment(call: CallbackQuery) -> None:
 
     # Получаем информацию о чеке, чтобы узнать длительность подписки
     check_info = await repository.get_payment_check(check_id)
-    duration_days = check_info["duration_days"] if check_info and check_info.get("duration_days") else settings.subscription_duration_days
+    duration_days = check_info["duration_days"] if check_info and "duration_days" in check_info.keys() and check_info["duration_days"] else settings.subscription_duration_days
 
     start = datetime.utcnow()
     start, end = await repository.set_subscription_active(
@@ -167,7 +167,7 @@ async def confirm_payment(call: CallbackQuery) -> None:
     except Exception as exc:
         logger.warning("Cannot notify user %s: %s", user_id, exc)
 
-    await call.message.edit_text("Доступ активирован", reply_markup=None)
+    await call.message.edit_text("Доступ активирован", reply_markup=None, parse_mode=None)
 
 
 @router.callback_query(F.data.startswith("pay-reject:"))
@@ -190,7 +190,7 @@ async def reject_payment(call: CallbackQuery) -> None:
     except Exception as exc:
         logger.warning("Cannot notify user %s: %s", user_id, exc)
 
-    await call.message.edit_text("Оплата отклонена", reply_markup=None)
+    await call.message.edit_text("Оплата отклонена", reply_markup=None, parse_mode=None)
 
 
 @router.callback_query(F.data == "admin:back")
@@ -208,7 +208,7 @@ async def admin_back(call: CallbackQuery) -> None:
             [InlineKeyboardButton(text="⬅️ Назад", callback_data="admin:back")],
         ]
     )
-    await call.message.edit_text("Админ-панель Resonance", reply_markup=markup)
+    await call.message.edit_text("Админ-панель Resonance", reply_markup=markup, parse_mode=None)
 
 
 @router.callback_query(F.data == "admin:gift_subscription")
@@ -331,6 +331,7 @@ async def confirm_gift_payment(call: CallbackQuery, state: FSMContext) -> None:
         f"🎁 Подтверждение подарка для @{username}\n\n"
         "Отправьте Telegram ID пользователя (user_id).\n"
         "ID можно узнать через @userinfobot или найти в базе данных бота.",
+        parse_mode=None,  # Отключаем Markdown, чтобы избежать ошибок парсинга
     )
     await state.set_state(GiftConfirmState.waiting_user_id)
 
@@ -421,4 +422,4 @@ async def reject_gift_payment(call: CallbackQuery) -> None:
     if row_index:
         sheets_manager.update_payment_status(row_index, "❌ Отклонено")
     
-    await call.message.edit_text(f"Подарок для @{username} отклонен", reply_markup=None)
+    await call.message.edit_text(f"Подарок для @{username} отклонен", reply_markup=None, parse_mode=None)
