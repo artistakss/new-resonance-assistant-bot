@@ -62,6 +62,37 @@ async def choose_plan(call: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(PaymentFlow.choosing_method)
 
 
+# Обработчик "pay:ready" должен быть ПЕРЕД choose_method, чтобы срабатывать первым
+@router.callback_query(F.data == "pay:ready")
+async def ready_to_upload(call: CallbackQuery, state: FSMContext) -> None:
+    try:
+        await call.answer("Ожидаю ваш чек...")
+        data = await state.get_data()
+        logger.info(f"pay:ready callback from user {call.from_user.id}, data: {data}")
+        
+        if not data.get("method"):
+            logger.warning(f"No method in state for user {call.from_user.id}")
+            await call.message.answer("Сначала выберите способ оплаты.")
+            return
+        
+        # Сохраняем состояние
+        await state.set_state(PaymentFlow.waiting_proof)
+        current_state = await state.get_state()
+        logger.info(f"State set to waiting_proof for user {call.from_user.id}, current_state: {current_state}")
+        
+        # Отправляем новое сообщение
+        sent_msg = await call.message.answer(
+            "📸 Отправьте фотографию или PDF-файл подтверждения оплаты.",
+        )
+        logger.info(f"Sent message to user {call.from_user.id} asking for proof, message_id: {sent_msg.message_id}")
+    except Exception as exc:
+        logger.error(f"Error in ready_to_upload: {exc}", exc_info=True)
+        try:
+            await call.answer("Произошла ошибка. Попробуйте еще раз.")
+        except:
+            pass
+
+
 @router.callback_query(PaymentFlow.choosing_method, F.data.startswith("pay:"))
 async def choose_method(call: CallbackQuery, state: FSMContext) -> None:
     try:
@@ -73,8 +104,8 @@ async def choose_method(call: CallbackQuery, state: FSMContext) -> None:
     logger.info(f"choose_method callback: method={method}, user={call.from_user.id}")
     
     if method == "ready":
-        # Это обрабатывается отдельным обработчиком - пропускаем
-        logger.info(f"Skipping 'ready' in choose_method, will be handled by ready_to_upload")
+        # Это обрабатывается отдельным обработчиком выше - не должно сюда попасть
+        logger.warning(f"pay:ready reached choose_method - this should not happen!")
         return
     if method == "back":
         # Возврат к выбору плана
@@ -112,37 +143,6 @@ async def choose_method(call: CallbackQuery, state: FSMContext) -> None:
             logger.error("Failed to send payment method details: %s", e)
     except Exception as exc:
         logger.error("Error in choose_method: %s", exc, exc_info=True)
-
-
-@router.callback_query(F.data == "pay:ready")
-async def ready_to_upload(call: CallbackQuery, state: FSMContext) -> None:
-    # Этот обработчик должен срабатывать для всех состояний, поэтому без фильтра состояния
-    try:
-        await call.answer("Ожидаю ваш чек...")
-        data = await state.get_data()
-        logger.info(f"pay:ready callback from user {call.from_user.id}, data: {data}")
-        
-        if not data.get("method"):
-            logger.warning(f"No method in state for user {call.from_user.id}")
-            await call.message.answer("Сначала выберите способ оплаты.")
-            return
-        
-        # Сохраняем состояние
-        await state.set_state(PaymentFlow.waiting_proof)
-        current_state = await state.get_state()
-        logger.info(f"State set to waiting_proof for user {call.from_user.id}, current_state: {current_state}")
-        
-        # Отправляем новое сообщение
-        sent_msg = await call.message.answer(
-            "📸 Отправьте фотографию или PDF-файл подтверждения оплаты.",
-        )
-        logger.info(f"Sent message to user {call.from_user.id} asking for proof, message_id: {sent_msg.message_id}")
-    except Exception as exc:
-        logger.error(f"Error in ready_to_upload: {exc}", exc_info=True)
-        try:
-            await call.answer("Произошла ошибка. Попробуйте еще раз.")
-        except:
-            pass
 
 
 @router.message(PaymentFlow.waiting_proof)
