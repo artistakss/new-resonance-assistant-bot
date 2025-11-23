@@ -60,20 +60,27 @@ class SheetsManager:
         status: str = "На проверке",
     ) -> Optional[int]:
         if not self.sheet:
+            logger.warning("Google Sheets not connected, skipping log_payment_check")
             return None
-        row = [
-            datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'),
-            user_id,
-            username or 'N/A',
-            method,
-            file_id,
-            status,
-            "",
-            "",
-            "",
-        ]
-        self.sheet.append_row(row)
-        return len(self.sheet.get_all_values())
+        try:
+            row = [
+                datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'),
+                user_id,
+                username or 'N/A',
+                method,
+                file_id,
+                status,
+                "",
+                "",
+                "",
+            ]
+            self.sheet.append_row(row)
+            row_index = len(self.sheet.get_all_values())
+            logger.info(f"Payment check logged to Google Sheets: row {row_index}, user {user_id}, method {method}")
+            return row_index
+        except Exception as exc:
+            logger.error(f"Failed to log payment check to Google Sheets: {exc}", exc_info=True)
+            return None
 
     def update_payment_status(
         self,
