@@ -39,12 +39,14 @@ logging.basicConfig(
 
 
 dp = Dispatcher(storage=MemoryStorage())
+# Роутеры с FSM состояниями должны быть ПЕРЕД общими обработчиками
+dp.include_router(payments.router)  # PaymentFlow состояния
+dp.include_router(gift.router)  # GiftFlow состояния
+dp.include_router(bookings.router)  # BookingFlow состояния
+dp.include_router(admin.router)  # Admin состояния
+# Общие обработчики в конце
 dp.include_router(start.router)
-dp.include_router(bookings.router)
-dp.include_router(payments.router)
-dp.include_router(gift.router)
 dp.include_router(status.router)
-dp.include_router(admin.router)
 
 
 @dp.startup.register
