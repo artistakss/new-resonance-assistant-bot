@@ -327,12 +327,23 @@ async def confirm_gift_payment(call: CallbackQuery, state: FSMContext) -> None:
     # Сохраняем данные в состоянии
     await state.update_data(gift_username=username, gift_check_id=check_id, gift_row_index=row_index)
     
-    await call.message.edit_text(
-        f"🎁 Подтверждение подарка для @{username}\n\n"
-        "Отправьте Telegram ID пользователя (user_id).\n"
-        "ID можно узнать через @userinfobot или найти в базе данных бота.",
-        parse_mode=None,  # Отключаем Markdown, чтобы избежать ошибок парсинга
-    )
+    # Проверяем, это фото или текстовое сообщение
+    if call.message.photo:
+        # Если это фото, редактируем caption
+        await call.message.edit_caption(
+            caption=f"🎁 Подтверждение подарка для @{username}\n\n"
+                    "Отправьте Telegram ID пользователя (user_id).\n"
+                    "ID можно узнать через @userinfobot или найти в базе данных бота.",
+            parse_mode=None,
+        )
+    else:
+        # Если это текстовое сообщение, редактируем текст
+        await call.message.edit_text(
+            f"🎁 Подтверждение подарка для @{username}\n\n"
+            "Отправьте Telegram ID пользователя (user_id).\n"
+            "ID можно узнать через @userinfobot или найти в базе данных бота.",
+            parse_mode=None,
+        )
     await state.set_state(GiftConfirmState.waiting_user_id)
 
 
