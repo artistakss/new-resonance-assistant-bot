@@ -64,8 +64,14 @@ async def handle_question(message: Message, state: FSMContext) -> None:
     
     # Проверяем, не находимся ли мы в состоянии оплаты или подарка
     current_state = await state.get_state()
-    if current_state and ("PaymentFlow" in str(current_state) or "GiftFlow" in str(current_state)):
-        return  # Пропускаем, если в состоянии оплаты/подарка
+    if current_state:
+        state_str = str(current_state)
+        if "PaymentFlow" in state_str or "GiftFlow" in state_str:
+            # Пропускаем, если в состоянии оплаты/подарка - эти обработчики должны обработать сообщение
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"Skipping handle_question for user {message.from_user.id}, state: {current_state}")
+            return
     
     user = message.from_user
     

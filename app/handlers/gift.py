@@ -36,8 +36,12 @@ async def start_gift(message: Message, state: FSMContext) -> None:
 async def receive_gift_username(message: Message, state: FSMContext) -> None:
     """Получение username для подарка"""
     try:
+        current_state = await state.get_state()
+        logger.info(f"receive_gift_username called for user {message.from_user.id}, state: {current_state}, text: {message.text}")
+        
         # Проверяем, что это текстовое сообщение
         if not message.text:
+            logger.warning(f"Non-text message in waiting_username from user {message.from_user.id}")
             await message.answer("❌ Пожалуйста, отправьте текстовое сообщение с username (например: @username или username).")
             return
         
