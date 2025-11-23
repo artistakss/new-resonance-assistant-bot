@@ -73,7 +73,8 @@ async def choose_method(call: CallbackQuery, state: FSMContext) -> None:
     logger.info(f"choose_method callback: method={method}, user={call.from_user.id}")
     
     if method == "ready":
-        # Это обрабатывается отдельным обработчиком
+        # Это обрабатывается отдельным обработчиком - пропускаем
+        logger.info(f"Skipping 'ready' in choose_method, will be handled by ready_to_upload")
         return
     if method == "back":
         # Возврат к выбору плана
@@ -115,6 +116,7 @@ async def choose_method(call: CallbackQuery, state: FSMContext) -> None:
 
 @router.callback_query(F.data == "pay:ready")
 async def ready_to_upload(call: CallbackQuery, state: FSMContext) -> None:
+    # Этот обработчик должен срабатывать для всех состояний, поэтому без фильтра состояния
     try:
         await call.answer("Ожидаю ваш чек...")
         data = await state.get_data()
