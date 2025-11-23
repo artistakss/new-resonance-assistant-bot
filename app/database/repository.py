@@ -115,6 +115,14 @@ async def get_user(user_id: int) -> Optional[aiosqlite.Row]:
         return await cursor.fetchone()
 
 
+async def get_user_by_username(username: str) -> Optional[aiosqlite.Row]:
+    """Найти пользователя по username (без @)"""
+    async with aiosqlite.connect(DB_PATH.as_posix()) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute("SELECT * FROM users WHERE username = ?", (username,))
+        return await cursor.fetchone()
+
+
 async def set_subscription_active(user_id: int, start: datetime, duration_days: int) -> tuple[datetime, datetime]:
     end = start + timedelta(days=duration_days)
     async with aiosqlite.connect(DB_PATH.as_posix()) as db:
