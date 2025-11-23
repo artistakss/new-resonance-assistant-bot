@@ -70,7 +70,10 @@ async def choose_method(call: CallbackQuery, state: FSMContext) -> None:
         pass  # Игнорируем ошибки ответа на callback
     
     _, method = call.data.split(":", 1)
+    logger.info(f"choose_method callback: method={method}, user={call.from_user.id}")
+    
     if method == "ready":
+        # Это обрабатывается отдельным обработчиком
         return
     if method == "back":
         # Возврат к выбору плана
@@ -113,33 +116,44 @@ async def choose_method(call: CallbackQuery, state: FSMContext) -> None:
 @router.callback_query(F.data == "pay:ready")
 async def ready_to_upload(call: CallbackQuery, state: FSMContext) -> None:
     try:
-        await call.answer()
+        await call.answer("Ожидаю ваш чек...")
         data = await state.get_data()
         logger.info(f"pay:ready callback from user {call.from_user.id}, data: {data}")
+        
         if not data.get("method"):
+            logger.warning(f"No method in state for user {call.from_user.id}")
             await call.message.answer("Сначала выберите способ оплаты.")
             return
         
-        # Сохраняем состояние и отправляем новое сообщение вместо редактирования
+        # Сохраняем состояние
         await state.set_state(PaymentFlow.waiting_proof)
-        logger.info(f"State set to waiting_proof for user {call.from_user.id}")
+        current_state = await state.get_state()
+        logger.info(f"State set to waiting_proof for user {call.from_user.id}, current_state: {current_state}")
         
-        # Отправляем новое сообщение вместо редактирования
-        await call.message.answer(
+        # Отправляем новое сообщение
+        sent_msg = await call.message.answer(
             "📸 Отправьте фотографию или PDF-файл подтверждения оплаты.",
         )
+        logger.info(f"Sent message to user {call.from_user.id} asking for proof, message_id: {sent_msg.message_id}")
     except Exception as exc:
         logger.error(f"Error in ready_to_upload: {exc}", exc_info=True)
-        await call.answer("Произошла ошибка. Попробуйте еще раз.")
+        try:
+            await call.answer("Произошла ошибка. Попробуйте еще раз.")
+        except:
+            pass
 
 
 @router.message(PaymentFlow.waiting_proof)
 async def receive_proof(message: Message, state: FSMContext) -> None:
+    current_state = await state.get_state()
+    logger.info(f"receive_proof called for user {message.from_user.id}, state: {current_state}, has_photo: {bool(message.photo)}, has_document: {bool(message.document)}")
+    
     # Проверяем, что это фото или документ
     if not (message.photo or message.document):
         logger.info(f"Invalid proof type from user {message.from_user.id}, text: {message.text}")
         await message.answer("Пришлите, пожалуйста, фото или документ с подтверждением оплаты.")
         return
+    
     try:
         data = await state.get_data()
         method = data.get("method", "N/A")

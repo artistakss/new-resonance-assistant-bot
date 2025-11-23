@@ -36,6 +36,11 @@ async def start_gift(message: Message, state: FSMContext) -> None:
 async def receive_gift_username(message: Message, state: FSMContext) -> None:
     """Получение username для подарка"""
     try:
+        # Проверяем, что это текстовое сообщение
+        if not message.text:
+            await message.answer("❌ Пожалуйста, отправьте текстовое сообщение с username (например: @username или username).")
+            return
+        
         username = message.text.strip().lstrip("@")
         logger.info(f"Received gift username from user {message.from_user.id}: {username}")
         
