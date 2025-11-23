@@ -125,62 +125,80 @@ async def ready_to_upload(call: CallbackQuery, state: FSMContext) -> None:
 
 @router.message(PaymentFlow.waiting_proof, F.photo | F.document)
 async def receive_proof(message: Message, state: FSMContext) -> None:
-    data = await state.get_data()
-    method = data.get("method", "N/A")
-    duration_days = data.get("duration_days", settings.subscription_duration_days)
-    price_kzt = data.get("price_kzt", settings.subscription_price)
-
-    if message.photo:
-        file_id = message.photo[-1].file_id
-    else:
-        file_id = message.document.file_id
-
-    user = message.from_user
-    row_index = sheets_manager.log_payment_check(user.id, user.username, method, file_id)
-    check_id = await repository.log_payment_check(
-        user.id, method, file_id, row_index, duration_days, price_kzt
-    )
-
-    period_text = f"{duration_days // 30} {'месяц' if duration_days == 30 else 'месяца' if duration_days == 90 else 'месяцев'}"
-    caption = (
-        "💸 Новый чек на проверку\n"
-        f"Пользователь: @{user.username or 'N/A'} ({user.id})\n"
-        f"Метод: {method}\n"
-        f"Период: {period_text} ({duration_days} дней)\n"
-        f"Сумма: {price_kzt:,} ₸\n"
-        f"ID записи: {check_id} | Строка Sheets: {row_index or '—'}"
-    )
-
-    markup = None
-    if row_index:
-        from app.handlers.admin import build_review_keyboard
-
-        markup = build_review_keyboard(user.id, check_id, row_index)
-
     try:
-        if message.photo:
-            await message.bot.send_photo(
-                settings.checker_id,
-                photo=file_id,
-                caption=caption,
-                reply_markup=markup,
-            )
-        else:
-            await message.bot.send_document(
-                settings.checker_id,
-                document=file_id,
-                caption=caption,
-                reply_markup=markup,
-            )
-    except Exception:
-        await message.bot.send_message(settings.checker_id, caption, reply_markup=markup)
+        data = await state.get_data()
+        method = data.get("method", "N/A")
+        duration_days = data.get("duration_days", settings.subscription_duration_days)
+        price_kzt = data.get("price_kzt", settings.subscription_price)
 
-    await message.answer(
-        "Спасибо! Чек отправлен на проверку."
-        " Мы уведомим вас, как только администратор подтвердит оплату.",
-        reply_markup=main_menu,
-    )
-    await state.clear()
+        if message.photo:
+            file_id = message.photo[-1].file_id
+        else:
+            file_id = message.document.file_id
+
+        user = message.from_user
+        logger.info(f"Received payment proof from user {user.id}, method: {method}")
+        
+        row_index = sheets_manager.log_payment_check(user.id, user.username, method, file_id)
+        check_id = await repository.log_payment_check(
+            user.id, method, file_id, row_index, duration_days, price_kzt
+        )
+
+        period_text = f"{duration_days // 30} {'месяц' if duration_days == 30 else 'месяца' if duration_days == 90 else 'месяцев'}"
+        caption = (
+            "💸 Новый чек на проверку\n"
+            f"Пользователь: @{user.username or 'N/A'} ({user.id})\n"
+            f"Метод: {method}\n"
+            f"Период: {period_text} ({duration_days} дней)\n"
+            f"Сумма: {price_kzt:,} ₸\n"
+            f"ID записи: {check_id} | Строка Sheets: {row_index or '—'}"
+        )
+
+        markup = None
+        if row_index:
+            from app.handlers.admin import build_review_keyboard
+
+            markup = build_review_keyboard(user.id, check_id, row_index)
+
+        # Отправляем уведомление админу
+        try:
+            if message.photo:
+                await message.bot.send_photo(
+                    settings.checker_id,
+                    photo=file_id,
+                    caption=caption,
+                    reply_markup=markup,
+                )
+            else:
+                await message.bot.send_document(
+                    settings.checker_id,
+                    document=file_id,
+                    caption=caption,
+                    reply_markup=markup,
+                )
+            logger.info(f"Payment check notification sent to checker_id {settings.checker_id}")
+        except Exception as exc:
+            logger.error(f"Failed to send photo/document to checker, trying text: {exc}")
+            try:
+                await message.bot.send_message(settings.checker_id, caption, reply_markup=markup)
+                logger.info(f"Payment check notification sent as text to checker_id {settings.checker_id}")
+            except Exception as exc2:
+                logger.error(f"Failed to send notification to checker_id {settings.checker_id}: {exc2}")
+
+        await message.answer(
+            "✅ Спасибо! Чек отправлен на проверку.\n"
+            "Мы уведомим вас, как только администратор подтвердит оплату.",
+            reply_markup=main_menu,
+        )
+        await state.clear()
+        logger.info(f"Payment proof processed successfully for user {user.id}")
+    except Exception as exc:
+        logger.error(f"Error processing payment proof: {exc}", exc_info=True)
+        await message.answer(
+            "❌ Произошла ошибка при обработке чека. Пожалуйста, попробуйте еще раз.",
+            reply_markup=main_menu,
+        )
+        await state.clear()
 
 
 @router.message(PaymentFlow.waiting_proof)

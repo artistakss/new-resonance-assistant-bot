@@ -53,7 +53,10 @@ def build_gift_review_keyboard(username: str, check_id: int, row_index: int | No
 
 
 @router.message(Command("admin"))
-async def admin_menu(message: Message) -> None:
+async def admin_menu(message: Message, state: FSMContext) -> None:
+    # Сбрасываем состояние FSM при входе в админ-панель
+    await state.clear()
+    
     # Проверка прав админа
     if message.from_user.id not in settings.allowed_admins:
         await message.answer("❌ У вас нет доступа к админ-панели.")

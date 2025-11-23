@@ -1,5 +1,6 @@
 from aiogram import F, Router
 from aiogram.filters import CommandStart
+from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
 from app.database import repository
@@ -9,7 +10,9 @@ router = Router()
 
 
 @router.message(CommandStart())
-async def cmd_start(message: Message) -> None:
+async def cmd_start(message: Message, state: FSMContext) -> None:
+    # Сбрасываем состояние FSM при /start
+    await state.clear()
     user = message.from_user
     await repository.upsert_user(user.id, user.username, user.full_name)
     await message.answer(
@@ -38,7 +41,9 @@ async def ask_question(message: Message) -> None:
 
 
 @router.message(F.text == "⬅️ Назад")
-async def back_to_main(message: Message) -> None:
+async def back_to_main(message: Message, state: FSMContext) -> None:
+    # Сбрасываем состояние FSM при возврате в главное меню
+    await state.clear()
     await message.answer(
         "🧘 Добро пожаловать в поле Resonance!\n\n"
         "Месяц подписки — 9 999 ₸ / 1 515 ₽.\n"
