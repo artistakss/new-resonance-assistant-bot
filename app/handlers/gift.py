@@ -35,25 +35,37 @@ async def start_gift(message: Message, state: FSMContext) -> None:
 @router.message(GiftFlow.waiting_username)
 async def receive_gift_username(message: Message, state: FSMContext) -> None:
     """Получение username для подарка"""
-    username = message.text.strip().lstrip("@")
-    
-    if not username:
-        await message.answer("❌ Неверный формат. Отправьте @username или username.")
-        return
-    
-    # Сохраняем username в состоянии
-    await state.update_data(gift_username=username)
-    
-    # Просим отправить чек
-    await message.answer(
-        f"Выбран получатель: @{username}\n\n"
-        "📸 Отправьте фотографию или PDF-файл подтверждения оплаты подарка.",
-    )
-    await state.set_state(GiftFlow.waiting_proof)
+    try:
+        username = message.text.strip().lstrip("@")
+        logger.info(f"Received gift username from user {message.from_user.id}: {username}")
+        
+        if not username:
+            await message.answer("❌ Неверный формат. Отправьте @username или username.")
+            return
+        
+        # Сохраняем username в состоянии
+        await state.update_data(gift_username=username)
+        logger.info(f"Gift username saved for user {message.from_user.id}: {username}")
+        
+        # Просим отправить чек
+        await message.answer(
+            f"Выбран получатель: @{username}\n\n"
+            "📸 Отправьте фотографию или PDF-файл подтверждения оплаты подарка.",
+        )
+        await state.set_state(GiftFlow.waiting_proof)
+        logger.info(f"State set to waiting_proof for gift from user {message.from_user.id}")
+    except Exception as exc:
+        logger.error(f"Error in receive_gift_username: {exc}", exc_info=True)
+        await message.answer("❌ Произошла ошибка. Попробуйте еще раз.")
 
 
-@router.message(GiftFlow.waiting_proof, F.photo | F.document)
+@router.message(GiftFlow.waiting_proof)
 async def receive_gift_proof(message: Message, state: FSMContext) -> None:
+    # Проверяем, что это фото или документ
+    if not (message.photo or message.document):
+        logger.info(f"Invalid gift proof type from user {message.from_user.id}, text: {message.text}")
+        await message.answer("Пожалуйста, отправьте фото или документ с подтверждением оплаты подарка.")
+        return
     """Получение чека для подарка подписки"""
     try:
         data = await state.get_data()
@@ -138,10 +150,4 @@ async def receive_gift_proof(message: Message, state: FSMContext) -> None:
         await state.clear()
 
 
-@router.message(GiftFlow.waiting_proof)
-async def invalid_gift_proof(message: Message) -> None:
-    """Обработка некорректного ввода для подарка"""
-    await message.answer(
-        "Пожалуйста, отправьте фото или документ с подтверждением оплаты подарка."
-    )
 
