@@ -33,6 +33,7 @@ class SheetsManager:
     def _ensure_headers(self) -> None:
         if not self.sheet:
             return
+        # Обновленная структура таблицы (без столбцов для бронирований)
         expected = [
             "Дата/Время",
             "user_id",
@@ -40,12 +41,14 @@ class SheetsManager:
             "Метод",
             "ID чека",
             "Статус",
-            "Начало",
-            "Окончание",
+            "Начало подписки",
+            "Окончание подписки",
             "Комментарий",
         ]
         current = self.sheet.row_values(1)
-        if current != expected:
+        # Обновляем заголовки, если они отличаются
+        if len(current) < len(expected) or current[:len(expected)] != expected:
+            # Обновляем только заголовки, не трогая данные
             self.sheet.update('A1:I1', [expected])
 
     def log_payment_check(
