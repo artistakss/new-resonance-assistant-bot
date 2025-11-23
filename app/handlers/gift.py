@@ -70,12 +70,16 @@ async def receive_gift_username(message: Message, state: FSMContext) -> None:
 
 @router.message(GiftFlow.waiting_proof)
 async def receive_gift_proof(message: Message, state: FSMContext) -> None:
+    """Получение чека для подарка подписки"""
+    current_state = await state.get_state()
+    logger.info(f"receive_gift_proof called for user {message.from_user.id}, state: {current_state}, has_photo: {bool(message.photo)}, has_document: {bool(message.document)}")
+    
     # Проверяем, что это фото или документ
     if not (message.photo or message.document):
         logger.info(f"Invalid gift proof type from user {message.from_user.id}, text: {message.text}")
         await message.answer("Пожалуйста, отправьте фото или документ с подтверждением оплаты подарка.")
         return
-    """Получение чека для подарка подписки"""
+    
     try:
         data = await state.get_data()
         gift_username = data.get("gift_username")
