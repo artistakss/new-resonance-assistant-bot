@@ -199,6 +199,7 @@ async def receive_proof(message: Message, state: FSMContext) -> None:
                     photo=file_id,
                     caption=caption,
                     reply_markup=markup,
+                    parse_mode=None,  # Отключаем Markdown, чтобы избежать ошибок парсинга
                 )
             else:
                 await message.bot.send_document(
@@ -206,15 +207,21 @@ async def receive_proof(message: Message, state: FSMContext) -> None:
                     document=file_id,
                     caption=caption,
                     reply_markup=markup,
+                    parse_mode=None,  # Отключаем Markdown, чтобы избежать ошибок парсинга
                 )
             logger.info(f"Payment check notification sent to checker_id {settings.checker_id}")
         except Exception as exc:
-            logger.error(f"Failed to send photo/document to checker, trying text: {exc}")
+            logger.error(f"Failed to send photo/document to checker, trying text: {exc}", exc_info=True)
             try:
-                await message.bot.send_message(settings.checker_id, caption, reply_markup=markup)
+                await message.bot.send_message(
+                    settings.checker_id, 
+                    caption, 
+                    reply_markup=markup,
+                    parse_mode=None,  # Отключаем Markdown
+                )
                 logger.info(f"Payment check notification sent as text to checker_id {settings.checker_id}")
             except Exception as exc2:
-                logger.error(f"Failed to send notification to checker_id {settings.checker_id}: {exc2}")
+                logger.error(f"Failed to send notification to checker_id {settings.checker_id}: {exc2}", exc_info=True)
 
         await message.answer(
             "✅ Спасибо! Чек отправлен на проверку.\n"
