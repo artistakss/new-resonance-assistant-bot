@@ -5,7 +5,7 @@ import os
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
-from typing import List
+from typing import Dict, List, Optional
 
 from dotenv import load_dotenv
 
@@ -25,14 +25,14 @@ else:
     load_dotenv(override=False)
 
 
-def _env(key: str, default: str | None = None) -> str:
+def _env(key: str, default: Optional[str] = None) -> str:
     value = os.getenv(key, default)
     if value is None:
         raise RuntimeError(f"Environment variable {key} is required but not set")
     return value
 
 
-def _env_int(key: str, default: int | None = None) -> int:
+def _env_int(key: str, default: Optional[int] = None) -> int:
     raw = os.getenv(key)
     if raw is None:
         if default is None:
@@ -62,14 +62,14 @@ class Settings:
     reminder_before_days: int = 3
     
     # Цены для разных вариантов подписки (в тенге)
-    subscription_prices: dict[int, int] = field(default_factory=lambda: {
+    subscription_prices: Dict[int, int] = field(default_factory=lambda: {
         30: 9999,   # 1 месяц
         90: 25000,  # 3 месяца (выгоднее на ~5000)
         180: 45000, # 6 месяцев (выгоднее на ~15000)
     })
     
     # Цены в рублях (для отображения)
-    subscription_prices_rub: dict[int, int] = field(default_factory=lambda: {
+    subscription_prices_rub: Dict[int, int] = field(default_factory=lambda: {
         30: 1515,   # 1 месяц
         90: 3788,   # 3 месяца
         180: 6818,  # 6 месяцев
@@ -78,7 +78,7 @@ class Settings:
     gspread_json_string: str = ""
     sheet_url: str = ""
 
-    openai_api_key: str | None = None
+    openai_api_key: Optional[str] = None
 
     database_path: Path = field(default=Path("storage/bot.db"))
 
@@ -99,7 +99,7 @@ class Settings:
         """Для обратной совместимости - возвращает первый админ из списка"""
         return self.allowed_admins[0] if self.allowed_admins else self.admin_id
 
-    def google_credentials(self) -> dict | None:
+    def google_credentials(self) -> Optional[dict]:
         if not self.gspread_json_string:
             return None
         try:

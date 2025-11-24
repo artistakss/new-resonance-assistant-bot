@@ -4,7 +4,7 @@ import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Iterable, List, Optional
+from typing import Iterable, List, Optional, Tuple
 
 import aiosqlite
 
@@ -13,7 +13,7 @@ from app.config import settings
 DB_PATH = settings.database_path
 DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
-CREATE_QUERIES: tuple[str, ...] = (
+CREATE_QUERIES: Tuple[str, ...] = (
     """
     CREATE TABLE IF NOT EXISTS users (
         user_id INTEGER PRIMARY KEY,
@@ -92,7 +92,7 @@ async def init_db() -> None:
         await db.commit()
 
 
-async def upsert_user(user_id: int, username: str | None, full_name: str | None) -> None:
+async def upsert_user(user_id: int, username: Optional[str], full_name: Optional[str]) -> None:
     async with aiosqlite.connect(DB_PATH.as_posix()) as db:
         await db.execute(
             """
@@ -123,7 +123,7 @@ async def get_user_by_username(username: str) -> Optional[aiosqlite.Row]:
         return await cursor.fetchone()
 
 
-async def set_subscription_active(user_id: int, start: datetime, duration_days: int) -> tuple[datetime, datetime]:
+async def set_subscription_active(user_id: int, start: datetime, duration_days: int) -> Tuple[datetime, datetime]:
     end = start + timedelta(days=duration_days)
     async with aiosqlite.connect(DB_PATH.as_posix()) as db:
         await db.execute(
@@ -210,9 +210,9 @@ async def log_payment_check(
     user_id: int, 
     method: str, 
     file_id: str, 
-    sheet_row: int | None,
+    sheet_row: Optional[int],
     duration_days: int = 30,
-    price_kzt: int | None = None,
+    price_kzt: Optional[int] = None,
 ) -> int:
     async with aiosqlite.connect(DB_PATH.as_posix()) as db:
         cursor = await db.execute(
@@ -243,7 +243,7 @@ async def update_payment_check_status(check_id: int, status: str) -> None:
         await db.commit()
 
 
-async def add_booking(user_id: int, mode: str, slot: str, note: str | None = None) -> int:
+async def add_booking(user_id: int, mode: str, slot: str, note: Optional[str] = None) -> int:
     async with aiosqlite.connect(DB_PATH.as_posix()) as db:
         cursor = await db.execute(
             "INSERT INTO bookings(user_id, mode, slot, note) VALUES(?, ?, ?, ?)",

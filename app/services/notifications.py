@@ -1,6 +1,6 @@
 """Утилиты для отправки уведомлений админам"""
 import logging
-from typing import List
+from typing import List, Optional
 
 from aiogram import Bot
 from aiogram.types import InlineKeyboardMarkup, Message
@@ -12,10 +12,10 @@ logger = logging.getLogger(__name__)
 
 async def notify_admins_about_check(
     bot: Bot,
-    photo_file_id: str | None = None,
-    document_file_id: str | None = None,
+    photo_file_id: Optional[str] = None,
+    document_file_id: Optional[str] = None,
     caption: str = "",
-    reply_markup: InlineKeyboardMarkup | None = None,
+    reply_markup: Optional[InlineKeyboardMarkup] = None,
 ) -> int:
     """
     Отправляет уведомление о чеке всем админам

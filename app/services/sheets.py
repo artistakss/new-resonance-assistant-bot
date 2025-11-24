@@ -54,7 +54,7 @@ class SheetsManager:
     def log_payment_check(
         self,
         user_id: int,
-        username: str | None,
+        username: Optional[str],
         method: str,
         file_id: str,
         status: str = "На проверке",
@@ -86,8 +86,8 @@ class SheetsManager:
         self,
         row_index: int,
         status: str,
-        start: datetime | None = None,
-        end: datetime | None = None,
+        start: Optional[datetime] = None,
+        end: Optional[datetime] = None,
     ) -> None:
         if not self.sheet:
             return
@@ -97,7 +97,7 @@ class SheetsManager:
             data.append({"range": f'H{row_index}', "values": [[end.strftime('%Y-%m-%d')]]})
         self.sheet.batch_update(data)
 
-    def log_booking(self, user_id: int, username: str | None, mode: str, slot: str, note: str | None) -> None:
+    def log_booking(self, user_id: int, username: Optional[str], mode: str, slot: str, note: Optional[str]) -> None:
         if not self.sheet:
             return
         row = [

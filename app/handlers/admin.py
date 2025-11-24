@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
+from typing import Optional
 
 from aiogram import F, Router
 from aiogram.filters import Command
@@ -35,7 +36,7 @@ class GiftConfirmState(StatesGroup):
     waiting_user_id = State()
 
 
-def build_review_keyboard(user_id: int, check_id: int, row_index: int | None) -> InlineKeyboardMarkup:
+def build_review_keyboard(user_id: int, check_id: int, row_index: Optional[int]) -> InlineKeyboardMarkup:
     buttons = [
         [InlineKeyboardButton(text="✅ Подтвердить", callback_data=f"pay-confirm:{user_id}:{check_id}:{row_index or 0}")],
         [InlineKeyboardButton(text="❌ Отклонить", callback_data=f"pay-reject:{user_id}:{check_id}:{row_index or 0}")],
@@ -43,7 +44,7 @@ def build_review_keyboard(user_id: int, check_id: int, row_index: int | None) ->
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
-def build_gift_review_keyboard(username: str, check_id: int, row_index: int | None) -> InlineKeyboardMarkup:
+def build_gift_review_keyboard(username: str, check_id: int, row_index: Optional[int]) -> InlineKeyboardMarkup:
     """Клавиатура для подтверждения подарка подписки"""
     buttons = [
         [InlineKeyboardButton(text="✅ Подтвердить подарок", callback_data=f"gift-confirm:{username}:{check_id}:{row_index or 0}")],

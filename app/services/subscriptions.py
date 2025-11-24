@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
+from typing import Optional
 
 from aiogram import Bot
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -50,7 +51,7 @@ async def check_subscriptions(bot: Bot) -> None:
             logger.debug("Cannot notify user %s about reminder: %s", user_id, exc)
 
 
-scheduler: AsyncIOScheduler | None = None
+scheduler: Optional[AsyncIOScheduler] = None
 
 
 def setup_scheduler(bot: Bot) -> AsyncIOScheduler:
