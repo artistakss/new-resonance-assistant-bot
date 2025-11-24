@@ -66,7 +66,13 @@ async def ask_question(message: Message) -> None:
     )
 
 
-@router.message(F.text.startswith("❓") == False, F.text != "🚪 Вход в Resonance", F.text != "🎁 Подарить подписку", F.text != "⬅️ Назад")
+@router.message(F.text == "🔄 Старт")
+async def start_button(message: Message, state: FSMContext) -> None:
+    # Обработчик кнопки "Старт" - то же самое, что /start
+    await cmd_start(message, state)
+
+
+@router.message(F.text.startswith("❓") == False, F.text != "🚪 Вход в Resonance", F.text != "🎁 Подарить подписку", F.text != "⬅️ Назад", F.text != "🔄 Старт")
 async def handle_question(message: Message, state: FSMContext) -> None:
     """Обработка вопроса пользователя (если не в состоянии оплаты/подарка)"""
     from app.config import settings
@@ -127,9 +133,3 @@ async def back_to_main(message: Message, state: FSMContext) -> None:
         "3 раза в неделю живые эфиры: сатсанги, практики, разборы, задания и новая информация.",
         reply_markup=main_menu,
     )
-
-
-@router.message(F.text == "🔄 Старт")
-async def start_button(message: Message, state: FSMContext) -> None:
-    # Обработчик кнопки "Старт" - то же самое, что /start
-    await cmd_start(message, state)
