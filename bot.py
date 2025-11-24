@@ -55,10 +55,12 @@ async def on_startup(bot: Bot) -> None:
     setup_scheduler(bot)
     if sheets_manager.enabled:
         logging.info("Google Sheets connected")
-    try:
-        await bot.send_message(settings.admin_id, "✅ Resonance Assistant запущен")
-    except Exception as exc:
-        logging.warning("Не удалось уведомить админа: %s", exc)
+    # Уведомляем всех админов о запуске
+    for admin_id in settings.allowed_admins:
+        try:
+            await bot.send_message(admin_id, "✅ Resonance Assistant запущен")
+        except Exception as exc:
+            logging.warning("Не удалось уведомить админа %s: %s", admin_id, exc)
 
 
 async def main() -> None:

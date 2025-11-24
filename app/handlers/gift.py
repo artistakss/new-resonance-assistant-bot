@@ -9,6 +9,7 @@ from app.config import settings
 from app.database import repository
 from app.keyboards.main import main_menu
 from app.keyboards.payments import confirm_payment_kb
+from app.services.notifications import notify_admins_about_check
 from app.services.sheets import sheets_manager
 
 logger = logging.getLogger(__name__)
@@ -122,37 +123,24 @@ async def receive_gift_proof(message: Message, state: FSMContext) -> None:
             
             markup = build_gift_review_keyboard(gift_username, check_id, row_index)
         
-        # Отправляем уведомление админу
-        try:
-            if message.photo:
-                await message.bot.send_photo(
-                    settings.checker_id,
-                    photo=file_id,
-                    caption=caption,
-                    reply_markup=markup,
-                    parse_mode=None,  # Отключаем Markdown, чтобы избежать ошибок парсинга
-                )
-            else:
-                await message.bot.send_document(
-                    settings.checker_id,
-                    document=file_id,
-                    caption=caption,
-                    reply_markup=markup,
-                    parse_mode=None,  # Отключаем Markdown, чтобы избежать ошибок парсинга
-                )
-            logger.info(f"Gift check notification sent to checker_id {settings.checker_id}")
-        except Exception as exc:
-            logger.error(f"Failed to send photo/document to checker, trying text: {exc}", exc_info=True)
-            try:
-                await message.bot.send_message(
-                    settings.checker_id, 
-                    caption, 
-                    reply_markup=markup,
-                    parse_mode=None,  # Отключаем Markdown
-                )
-                logger.info(f"Gift check notification sent as text to checker_id {settings.checker_id}")
-            except Exception as exc2:
-                logger.error(f"Failed to send notification to checker_id {settings.checker_id}: {exc2}", exc_info=True)
+        # Отправляем уведомление всем админам
+        if message.photo:
+            sent_count = await notify_admins_about_check(
+                message.bot,
+                photo_file_id=file_id,
+                caption=caption,
+                reply_markup=markup,
+            )
+        else:
+            sent_count = await notify_admins_about_check(
+                message.bot,
+                document_file_id=file_id,
+                caption=caption,
+                reply_markup=markup,
+            )
+        
+        if sent_count == 0:
+            logger.error("Failed to send gift check notification to any admin")
         
         await message.answer(
             f"✅ Спасибо! Чек на подарок для @{gift_username} отправлен на проверку.\n"

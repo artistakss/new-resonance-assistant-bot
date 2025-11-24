@@ -62,5 +62,12 @@ async def save_booking(message: Message, state: FSMContext) -> None:
         f"Детали: {slot}\n"
         f"ID брони: {booking_id}"
     )
-    await message.bot.send_message(settings.admin_id, notify)
+    # Отправляем уведомление всем админам
+    for admin_id in settings.allowed_admins:
+        try:
+            await message.bot.send_message(admin_id, notify)
+        except Exception as exc:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to notify admin {admin_id} about booking: {exc}")
     await state.clear()

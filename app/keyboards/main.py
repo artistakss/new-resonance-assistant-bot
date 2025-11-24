@@ -12,6 +12,7 @@ main_menu = ReplyKeyboardMarkup(
             KeyboardButton(text="❓ Задать вопрос"),
         ],
         [
+            KeyboardButton(text="🔄 Старт"),
             KeyboardButton(text="⬅️ Назад"),
         ],
     ],

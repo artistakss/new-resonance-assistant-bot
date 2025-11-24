@@ -38,19 +38,28 @@ async def ask_question(message: Message) -> None:
     user = message.from_user
     question_text = "Напишите ваш вопрос в свободной форме."
     
-    # Отправляем вопрос админу
-    try:
-        admin_message = (
-            f"❓ Новый вопрос\n"
-            f"От: @{user.username or 'N/A'} ({user.id})\n"
-            f"Имя: {user.full_name or 'N/A'}\n\n"
-            f"Вопрос будет отправлен после того, как пользователь его напишет."
-        )
-        await message.bot.send_message(settings.admin_id, admin_message)
-    except Exception as exc:
+    # Отправляем вопрос всем админам
+    admin_message = (
+        f"❓ Новый вопрос\n"
+        f"От: @{user.username or 'N/A'} ({user.id})\n"
+        f"Имя: {user.full_name or 'N/A'}\n\n"
+        f"Вопрос будет отправлен после того, как пользователь его напишет."
+    )
+    
+    sent_count = 0
+    for admin_id in settings.allowed_admins:
+        try:
+            await message.bot.send_message(admin_id, admin_message)
+            sent_count += 1
+        except Exception as exc:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to notify admin {admin_id} about question: {exc}")
+    
+    if sent_count == 0:
         import logging
         logger = logging.getLogger(__name__)
-        logger.error(f"Failed to notify admin about question: {exc}")
+        logger.error("Failed to notify any admin about question")
     
     await message.answer(
         question_text + "\nАдминистратор свяжется с вами в течение дня."
@@ -75,24 +84,33 @@ async def handle_question(message: Message, state: FSMContext) -> None:
     
     user = message.from_user
     
-    # Отправляем вопрос админу
-    try:
-        admin_message = (
-            f"❓ Вопрос от пользователя\n"
-            f"От: @{user.username or 'N/A'} ({user.id})\n"
-            f"Имя: {user.full_name or 'N/A'}\n\n"
-            f"Вопрос:\n{message.text}"
-        )
-        await message.bot.send_message(settings.admin_id, admin_message)
-        
+    # Отправляем вопрос всем админам
+    admin_message = (
+        f"❓ Вопрос от пользователя\n"
+        f"От: @{user.username or 'N/A'} ({user.id})\n"
+        f"Имя: {user.full_name or 'N/A'}\n\n"
+        f"Вопрос:\n{message.text}"
+    )
+    
+    sent_count = 0
+    for admin_id in settings.allowed_admins:
+        try:
+            await message.bot.send_message(admin_id, admin_message)
+            sent_count += 1
+        except Exception as exc:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to notify admin {admin_id} about question: {exc}")
+    
+    if sent_count > 0:
         await message.answer(
             "✅ Ваш вопрос отправлен администратору.\n"
             "Мы свяжемся с вами в течение дня."
         )
-    except Exception as exc:
+    else:
         import logging
         logger = logging.getLogger(__name__)
-        logger.error(f"Failed to send question to admin: {exc}")
+        logger.error("Failed to send question to any admin")
         await message.answer("Произошла ошибка при отправке вопроса. Попробуйте позже.")
 
 
@@ -100,6 +118,8 @@ async def handle_question(message: Message, state: FSMContext) -> None:
 async def back_to_main(message: Message, state: FSMContext) -> None:
     # Сбрасываем состояние FSM при возврате в главное меню
     await state.clear()
+    user = message.from_user
+    await repository.upsert_user(user.id, user.username, user.full_name)
     await message.answer(
         "🧘 Добро пожаловать в поле Resonance!\n\n"
         "Месяц подписки — 9 999 ₸ / 1 515 ₽.\n"
@@ -107,3 +127,9 @@ async def back_to_main(message: Message, state: FSMContext) -> None:
         "3 раза в неделю живые эфиры: сатсанги, практики, разборы, задания и новая информация.",
         reply_markup=main_menu,
     )
+
+
+@router.message(F.text == "🔄 Старт")
+async def start_button(message: Message, state: FSMContext) -> None:
+    # Обработчик кнопки "Старт" - то же самое, что /start
+    await cmd_start(message, state)

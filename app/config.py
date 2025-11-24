@@ -54,7 +54,6 @@ def _resolve_database_path(path_str: str) -> Path:
 class Settings:
     bot_token: str
     admin_id: int
-    checker_id: int
     channel_id: int
     channel_invite_link: str
 
@@ -85,13 +84,20 @@ class Settings:
 
     @property
     def allowed_admins(self) -> List[int]:
+        """Список всех админов (из ADMIN_ID и ALLOWED_ADMINS)"""
         raw = os.getenv("ALLOWED_ADMINS")
         if raw:
             ids = {int(item.strip()) for item in raw.split(',') if item.strip()}
         else:
             ids = set()
-        ids.update({self.admin_id, self.checker_id})
+        # Добавляем основной admin_id
+        ids.add(self.admin_id)
         return sorted(ids)
+    
+    @property
+    def checker_id(self) -> int:
+        """Для обратной совместимости - возвращает первый админ из списка"""
+        return self.allowed_admins[0] if self.allowed_admins else self.admin_id
 
     def google_credentials(self) -> dict | None:
         if not self.gspread_json_string:
@@ -107,7 +113,6 @@ def get_settings() -> Settings:
     return Settings(
         bot_token=_env("BOT_TOKEN"),
         admin_id=_env_int("ADMIN_ID"),
-        checker_id=_env_int("CHECKER_ID"),
         channel_id=_env_int("CHANNEL_ID"),
         channel_invite_link=_env("CHANNEL_LINK"),
         subscription_price=_env_int("SUBSCRIPTION_PRICE", 20000),
