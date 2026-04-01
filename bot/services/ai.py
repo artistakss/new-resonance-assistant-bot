@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from typing import Any
 from typing import List, Optional, TypedDict
 
 import httpx
@@ -30,23 +31,26 @@ async def chat_completion(messages: List[ChatMessage]) -> str:
 
     model = _get_openai_model()
 
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        resp = await client.post(
-            "https://api.openai.com/v1/chat/completions",
-            headers={"Authorization": f"Bearer {api_key}"},
-            json={
-                "model": model,
-                "messages": messages,
-                "temperature": 0.7,
-            },
-        )
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            resp = await client.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={"Authorization": f"Bearer {api_key}"},
+                json={
+                    "model": model,
+                    "messages": messages,
+                    "temperature": 0.7,
+                },
+            )
+    except Exception as exc:
+        raise OpenAIChatError("⚠️ Ошибка при обращении к AI. Попробуй позже.") from exc
 
     if resp.status_code >= 400:
-        raise OpenAIChatError(f"OpenAI API error {resp.status_code}: {resp.text}")
+        raise OpenAIChatError("⚠️ Ошибка при обращении к AI. Попробуй позже.")
 
-    data = resp.json()
+    data: Any = resp.json()
     try:
         return data["choices"][0]["message"]["content"].strip()
     except Exception as exc:
-        raise OpenAIChatError(f"Unexpected OpenAI response shape: {data}") from exc
+        raise OpenAIChatError("⚠️ Ошибка при обращении к AI. Попробуй позже.") from exc
 
